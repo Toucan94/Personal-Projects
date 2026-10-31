@@ -1,0 +1,1 @@
+Everything I will code while trying to learn Vulkan. I don't yet have an end goal in mind and this folder exists just to track my learning process.
