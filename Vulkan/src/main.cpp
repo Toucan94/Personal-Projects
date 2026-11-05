@@ -16,6 +16,7 @@ import vulkan_hpp;
 #include <vector>
 #include <cstring>
 #include <cassert>
+#include <fstream>
 
 
 constexpr uint32_t WIDTH = 800;
@@ -30,6 +31,25 @@ constexpr bool enableValidationLayers = false;
 #else
 constexpr bool enableValidationLayers = true;
 #endif
+
+static std::vector<char> readFile(const std::string& filename) {
+    std::ifstream file(filename, std::ios::ate | std::ios::binary);
+
+    if (!file.is_open()) {
+        throw std::runtime_error("failed to open file!");
+    }
+
+    std::vector<char> buffer(file.tellg());
+
+    file.seekg(0, std::ios::beg);
+    file.read(buffer.data(), static_cast<std::streamsize>(buffer.size()));
+
+    file.close();
+
+    std::cout << buffer.size() << std::endl;
+
+    return buffer;
+}
 
 class HelloTriangleApplication {
 public:
@@ -63,6 +83,8 @@ private:
 
     vk::raii::SwapchainKHR swapChain = nullptr;
     std::vector<vk::Image> swapChainImages;
+
+    std::vector<vk::raii::ImageView> swapChainImageViews;
 
     static VKAPI_ATTR vk::Bool32 VKAPI_CALL debugCallback(vk::DebugUtilsMessageSeverityFlagBitsEXT      severity,
                                                       vk::DebugUtilsMessageTypeFlagsEXT             type,
@@ -341,6 +363,50 @@ private:
         swapChainImages = swapChain.getImages();
     }
 
+    void createImageViews() {
+        assert(swapChainImageViews.empty());
+
+        vk::ImageViewCreateInfo imageViewCreateInfo{
+            .viewType         = vk::ImageViewType::e2D,
+            .format           = swapChainSurfaceFormat.format,
+            .subresourceRange = { vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1 }
+        };
+
+        for (auto &image : swapChainImages) {
+            imageViewCreateInfo.image = image;
+            swapChainImageViews.emplace_back( device, imageViewCreateInfo );
+        }
+    }
+
+    [[nodiscard]] vk::raii::ShaderModule createShaderModule(const std::vector<char>& code) const {
+        vk::ShaderModuleCreateInfo createInfo{
+            .codeSize = code.size() * sizeof(char),
+            .pCode = reinterpret_cast<const uint32_t*>(code.data())
+        };
+
+        vk::raii::ShaderModule shaderModule{ device, createInfo };
+
+        return shaderModule;
+    }
+
+    void createGraphicsPipeline() {
+        vk::raii::ShaderModule shaderModule = createShaderModule(readFile(SHADER_DIR "slang.spv"));
+
+        vk::PipelineShaderStageCreateInfo vertShaderStageInfo{
+            .stage  = vk::ShaderStageFlagBits::eVertex,
+            .module = shaderModule,
+            .pName  = "vertMain"
+        };
+
+        vk::PipelineShaderStageCreateInfo fragShaderStageInfo{
+            .stage  = vk::ShaderStageFlagBits::eFragment,
+            .module = shaderModule,
+            .pName  = "fragMain"
+        };
+
+        vk::PipelineShaderStageCreateInfo shaderStages[] = {vertShaderStageInfo, fragShaderStageInfo};
+    }
+
     void initVulkan() {
         createInstance();
         setupDebugMessenger();
@@ -348,6 +414,8 @@ private:
         pickPhysicalDevice();
         createLogicalDevice();
         createSwapChain();
+        createImageViews();
+        createGraphicsPipeline();
     }
 
     void mainLoop() {
