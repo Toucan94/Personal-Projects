@@ -16,6 +16,7 @@ add_executable(Main src/main.cpp)
 
 target_compile_definitions(Main PRIVATE
     VULKAN_HPP_NO_STRUCT_CONSTRUCTORS
+    VULKAN_HPP_HANDLE_ERROR_OUT_OF_DATE_AS_SUCCESS
     SHADER_DIR="${CMAKE_CURRENT_SOURCE_DIR}/shaders/"
 )
 
